@@ -123,5 +123,59 @@ namespace LinqToExcel.Tests
 
             Assert.AreEqual(null, firstCompany.Name);
         }
+
+        [Test]
+        public void add_second_transformation_for_new_class_same_property_name()
+        {
+            string testValue = "Awesome test value";
+            //Add transformations to change the Name value to null for one class, testValue for another
+            _repo.AddTransformation<Company>(p => p.Name, value => null);
+            _repo.AddTransformation<NewCompany>(p => p.Name, value => testValue);
+            var firstCompany = (from c in _repo.Worksheet<Company>(_worksheetName)
+                                select c).First();
+            var secondCompany = (from c in _repo.Worksheet<NewCompany>(_worksheetName)
+                                select c).First();
+
+            Assert.AreEqual(null, firstCompany.Name);
+            Assert.AreEqual(testValue, secondCompany.Name);
+        }
+
+        [Test]
+        public void add_second_transformation_for_new_class_same_property_name_different_property_type()
+        {
+            DateTime now = DateTime.Now;
+            string testValue = "Awesome test value";
+            //Add transformation to change the StartDate value to DateTime.Now OR testValue
+            // depending on the active transform
+            _repo.AddTransformation<Company>(p => p.StartDate, value => now);
+            _repo.AddTransformation<NewerCompany>(p => p.StartDate, value => testValue);
+            var firstCompany = (from c in _repo.Worksheet<Company>(_worksheetName)
+                                select c).First();
+            var secondCompany = (from c in _repo.Worksheet<NewerCompany>(_worksheetName)
+                                 select c).First();
+
+            Assert.AreEqual(now, firstCompany.StartDate);
+            Assert.AreEqual(testValue, secondCompany.StartDate);
+        }
+
+        [Test]
+        public void add_universal_transformation_for_all_properties_of_a_given_type()
+        {
+            string testValue = "Awesome test value";
+            //Add transformation to change all incoming values of a certain type
+            _repo.AddTransformation<string>(value => testValue);
+            var firstCompany = (from c in _repo.Worksheet<Company>(_worksheetName)
+                                select c).First();
+            var secondCompany = (from c in _repo.Worksheet<NewCompany>(_worksheetName)
+                                 select c).First();
+            var thirdCompany = (from c in _repo.Worksheet<NewerCompany>(_worksheetName)
+                                 select c).First();
+
+            Assert.AreEqual(testValue, firstCompany.Name);
+            Assert.AreEqual(testValue, firstCompany.CEO);
+            Assert.AreEqual(testValue, secondCompany.Name);
+            Assert.AreEqual(testValue, thirdCompany.Name);
+            Assert.AreEqual(testValue, thirdCompany.StartDate);
+        }
     }
 }

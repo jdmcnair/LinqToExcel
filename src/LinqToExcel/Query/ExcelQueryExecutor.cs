@@ -90,7 +90,7 @@ namespace LinqToExcel.Query
             var sql = GetSqlStatement(queryModel);
             LogSqlStatement(sql);
 
-            var objectResults = GetDataResults(sql, queryModel);
+            var objectResults = GetDataResults<T>(sql, queryModel);
             var projector = GetSelectProjector<T>(objectResults.FirstOrDefault(), queryModel);
             var returnResults = objectResults.Cast<T>(projector);
 
@@ -160,7 +160,7 @@ namespace LinqToExcel.Query
         /// </summary>
         /// <typeparam name="T">Data type in the main from clause (queryModel.MainFromClause.ItemType)</typeparam>
         /// <param name="queryModel">Linq query model</param>
-        protected IEnumerable<object> GetDataResults(SqlParts sql, QueryModel queryModel)
+        protected IEnumerable<object> GetDataResults<T>(SqlParts sql, QueryModel queryModel)
         {
             IEnumerable<object> results;
             OleDbDataReader data = null;
@@ -190,7 +190,7 @@ namespace LinqToExcel.Query
                 else if (queryModel.MainFromClause.ItemType == typeof(RowNoHeader))
                     results = GetRowNoHeaderResults(data);
                 else
-                    results = GetTypeResults(data, columns, queryModel);
+                    results = GetTypeResults<T>(data, columns, queryModel);
             }
             return results;
         }
@@ -259,7 +259,7 @@ namespace LinqToExcel.Query
             return results.AsEnumerable();
         }
 
-        private IEnumerable<object> GetTypeResults(IDataReader data, IEnumerable<string> columns, QueryModel queryModel)
+        private IEnumerable<object> GetTypeResults<T>(IDataReader data, IEnumerable<string> columns, QueryModel queryModel)
         {
             var results = new List<object>();
             var fromType = queryModel.MainFromClause.ItemType;
@@ -276,7 +276,7 @@ namespace LinqToExcel.Query
                         _args.ColumnMappings[prop.Name] :
                         prop.Name;
                     if (columns.Contains(columnName))
-                        result.SetProperty(prop.Name, GetColumnValue(data, columnName, prop.Name).Cast(prop.PropertyType));
+                        result.SetProperty(prop.Name, GetColumnValue<T>(data, columnName, prop.Name, prop.PropertyType).Cast(prop.PropertyType));
                 }
                 results.Add(result);
             }
@@ -315,12 +315,24 @@ namespace LinqToExcel.Query
             return !_args.ColumnMappings.Values.Contains(columnName);
         }
 
-        private object GetColumnValue(IDataRecord data, string columnName, string propertyName)
+        private object GetColumnValue<T>(IDataRecord data, string columnName, string propertyName, Type propertyType)
         {
-            //Perform the property transformation if there is one
-            return (_args.Transformations.ContainsKey(propertyName)) ?
-                _args.Transformations[propertyName](data[columnName].ToString()) :
-                data[columnName];
+            var key = TransformKey.Create(typeof(T), propertyName);
+            object value;
+
+            if (_args.Transformations.ContainsKey(key))
+            {
+                //Perform the property transformation if there is one
+                value = _args.Transformations[key](data[columnName].ToString());
+            }
+            else if(_args.TypeTransformations.ContainsKey(propertyType))
+            {
+                //Perform the type transformation if there is one
+                value = _args.TypeTransformations[propertyType](data[columnName].ToString());
+            }
+            else value = data[columnName];
+
+            return value;
         }
 
         private IEnumerable<object> GetScalarResults(IDataReader data)

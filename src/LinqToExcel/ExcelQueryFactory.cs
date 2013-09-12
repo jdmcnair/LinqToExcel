@@ -9,7 +9,8 @@ namespace LinqToExcel
     public class ExcelQueryFactory : IExcelQueryFactory
     {
         private readonly Dictionary<string, string> _columnMappings = new Dictionary<string, string>();
-        private readonly Dictionary<string, Func<string, object>> _transformations = new Dictionary<string, Func<string, object>>();
+        private readonly Dictionary<TransformKey, Func<string, object>> _transformations = new Dictionary<TransformKey, Func<string, object>>();
+        private readonly Dictionary<Type, Func<string, object>> _typeTransformations = new Dictionary<Type, Func<string, object>>();
 
         /// <summary>
         /// Full path to the Excel spreadsheet
@@ -89,6 +90,11 @@ namespace LinqToExcel
             return mExp.Member.Name;
         }
 
+        private TransformKey GetTransformKey<TSheetData>(Expression<Func<TSheetData, object>> property)
+        {
+            return TransformKey.Create(typeof(TSheetData), GetPropertyName(property));
+        }
+
         /// <summary>
         /// Transforms a cell value in the spreadsheet to the desired property value
         /// </summary>
@@ -101,7 +107,12 @@ namespace LinqToExcel
         /// </example>
         public void AddTransformation<TSheetData>(Expression<Func<TSheetData, object>> property, Func<string, object> transformation)
         {
-            _transformations.Add(GetPropertyName(property), transformation);
+            _transformations.Add(GetTransformKey(property), transformation);
+        }
+
+        public void AddTransformation<TProperty>(Func<string, object> transformation)
+        {
+            _typeTransformations.Add(typeof(TProperty), transformation);            
         }
 
         /// <summary>
@@ -135,7 +146,8 @@ namespace LinqToExcel
                 DatabaseEngine = DatabaseEngine,
                 StrictMapping = StrictMapping,
                 ColumnMappings = _columnMappings,
-                Transformations = _transformations
+                Transformations = _transformations,
+                TypeTransformations = _typeTransformations
             };
         }
 

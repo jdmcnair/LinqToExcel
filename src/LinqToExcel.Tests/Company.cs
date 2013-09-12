@@ -10,4 +10,15 @@ namespace LinqToExcel.Tests
         public DateTime StartDate { get; set; }
         public bool IsActive { get; set; }
     }
+
+    public class NewCompany 
+    {
+        public string Name { get; set; }
+    }
+
+    public class NewerCompany
+    {
+        public string Name { get; set; }
+        public string StartDate { get; set; }
+    }
 }
