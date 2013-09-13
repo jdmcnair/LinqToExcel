@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Collections;
 using System.Text.RegularExpressions;
 using System.Linq.Expressions;
+using System.Linq;
 
 namespace LinqToExcel.Extensions
 {
@@ -17,6 +18,20 @@ namespace LinqToExcel.Extensions
         public static void SetProperty(this object @object, string propertyName, object value)
         {
             @object.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, @object, new object[] { value });
+        }
+
+        public static void SetListProperty(this object @object, string propertyName, IQueryable value, Type fkType)
+        {
+            Type listType = typeof(List<>);
+            Type genListType = listType.MakeGenericType(fkType);
+            IList list = Activator.CreateInstance(genListType) as IList;
+
+            foreach (var item in value)
+            {
+                list.Add(item);
+            }
+
+            @object.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, @object, new object[] { list });
         }
 
         /// <summary>

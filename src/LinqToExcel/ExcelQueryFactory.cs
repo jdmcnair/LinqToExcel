@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using LinqToExcel.Domain;
 using LinqToExcel.Query;
+using System.Linq;
+using Remotion.Collections;
 
 namespace LinqToExcel
 {
@@ -11,6 +13,9 @@ namespace LinqToExcel
         private readonly Dictionary<string, string> _columnMappings = new Dictionary<string, string>();
         private readonly Dictionary<TransformKey, Func<string, object>> _transformations = new Dictionary<TransformKey, Func<string, object>>();
         private readonly Dictionary<Type, Func<string, object>> _typeTransformations = new Dictionary<Type, Func<string, object>>();
+        private readonly Dictionary<TransformKey, Tuple<string, Func<object, IQueryable, IQueryable>>> _foreignKeyTransformations = 
+            new Dictionary<TransformKey, Tuple<string, Func<object, IQueryable, IQueryable>>>();
+        private readonly Dictionary<TransformKey,IQueryable> _sheetDataIncludes = new Dictionary<TransformKey,IQueryable>();
 
         /// <summary>
         /// Full path to the Excel spreadsheet
@@ -110,9 +115,60 @@ namespace LinqToExcel
             _transformations.Add(GetTransformKey(property), transformation);
         }
 
+        /// <summary>
+        /// Transforms all cell values mapped to a particular property type in the spreadsheet to the desired property value
+        /// </summary>
+        /// <typeparam name="TProperty">Class type to return row data as</typeparam>
+        /// <param name="transformation">Lambda expression that transforms the original string value to the desired property value</param>
+        /// <example>
+        /// AddTransformation{bool}(x => x == "Y");
+        /// AddTransformation{bool}(x => DateTime.Parse(x) > new DateTime(2000, 1, 1));
+        /// </example>
         public void AddTransformation<TProperty>(Func<string, object> transformation)
         {
             _typeTransformations.Add(typeof(TProperty), transformation);            
+        }
+
+        /// <summary>
+        /// Adds a mapping to relate members of one spreadsheet to another by way of a selection query
+        /// </summary>
+        /// <typeparam name="TSheetData">Class type to return row data as</typeparam>
+        /// <typeparam name="TSheetData2">Class of mapped type</typeparam>
+        /// <param name="property">Lambda expression that selects the List property to set</param>
+        /// <param name="transformation">Lambda expression that selects members from the second worksheet to relate to the first</param>
+        /// <param name="worksheet">optional worksheet name</param>
+        /// <example>
+        /// AddMapping{Group,People}(g => g.GroupMembers, (g,pp) => pp.Where(p => p.GroupId == g.Id);
+        /// </example>
+        public void AddMapping<TSheetData, TSheetData2>(
+            Expression<Func<TSheetData, IList<TSheetData2>>> property,
+            Func<TSheetData, IQueryable<TSheetData2>, IQueryable<TSheetData2>> transformation, 
+            string worksheet = null) where TSheetData : class
+        {
+            Func<object, IQueryable, IQueryable> function = (t1, qt2) => GetFunction<TSheetData,TSheetData2>(t1, qt2, transformation);
+
+            // Add the boxing operation, but get a weakly typed expression
+            Expression converted = Expression.Convert(property.Body, typeof(object));
+
+            // Use Expression.Lambda to get back to strong typing
+            var keyProperty = Expression.Lambda<Func<TSheetData,object>>(converted, property.Parameters);
+
+            var tk = GetTransformKey(keyProperty);
+
+            worksheet = worksheet ?? tk.Item2;
+            var sheetData2Query = this.Worksheet<TSheetData2>(worksheet);
+            _sheetDataIncludes.Add(TransformKey.Create(typeof(TSheetData2),worksheet), sheetData2Query);
+
+            _foreignKeyTransformations.Add(tk, Tuple.Create(worksheet, function));
+        }
+
+        IQueryable GetFunction<TSheetData,TSheetData2>(object type, IQueryable fkQuery,
+            Func<TSheetData, IQueryable<TSheetData2>, IQueryable<TSheetData2>> transformation) where TSheetData : class
+        {
+            TSheetData sheet1Object = type as TSheetData;
+            IQueryable<TSheetData2> sheet2Data = fkQuery.Cast<TSheetData2>();
+            var sheet2Selection = transformation(sheet1Object, sheet2Data);
+            return sheet2Selection;
         }
 
         /// <summary>
@@ -147,7 +203,9 @@ namespace LinqToExcel
                 StrictMapping = StrictMapping,
                 ColumnMappings = _columnMappings,
                 Transformations = _transformations,
-                TypeTransformations = _typeTransformations
+                TypeTransformations = _typeTransformations,
+                ForeignKeyTransformations = _foreignKeyTransformations,
+                SheetDataIncludes = _sheetDataIncludes
             };
         }
 

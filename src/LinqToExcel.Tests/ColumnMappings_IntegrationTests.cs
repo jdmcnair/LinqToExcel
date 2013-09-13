@@ -177,5 +177,47 @@ namespace LinqToExcel.Tests
             Assert.AreEqual(testValue, thirdCompany.Name);
             Assert.AreEqual(testValue, thirdCompany.StartDate);
         }
+
+        [Test]
+        public void add_mapping_to_link_spreadsheets_with_FK_type_references()
+        {
+            // Add a mapping that sets a List valued property from a query that relates another worksheet
+            _repo.AddMapping<Group,Person>(g => g.GroupMembers, (g,pp) => pp.Where(p => p.GroupId == g.Id), "People");
+
+            var groups = (from g in _repo.Worksheet<Group>("Groups") select g);
+            // People table is only queried here to confirm results
+            var people = (from p in _repo.Worksheet<Person>("People") select p);
+
+            Assert.AreEqual(6, groups.Count());
+            Assert.AreEqual(100, people.Count());
+
+            var firstGroup = groups.First();
+            var firstGroupMemberIds = (from p in people where p.GroupId == firstGroup.Id select p.Id).ToList();
+
+            Assert.AreEqual(firstGroup.GroupMembers.Count, firstGroupMemberIds.Count);
+            Assert.IsTrue(firstGroupMemberIds.All(id => firstGroup.GroupMembers.Any(m => m.Id == id)));
+        }
+
+
+        [Test]
+        public void add_mapping_to_link_spreadsheets_with_FK_type_references_with_inferred_worksheet_name()
+        {
+            // Add a mapping that sets a List valued property from a query that relates another worksheet
+            // note that no worksheet name is provided this time, as the name is inferred from the "People"
+            // property of the Group class
+            _repo.AddMapping<Group, Person>(g => g.People, (g, pp) => pp.Where(p => p.GroupId == g.Id));
+
+            var groups = (from g in _repo.Worksheet<Group>("Groups") select g);
+            var people = (from p in _repo.Worksheet<Person>("People") select p);
+
+            Assert.AreEqual(6, groups.Count());
+            Assert.AreEqual(100, people.Count());
+
+            var firstGroup = groups.First();
+            var firstGroupMemberIds = (from p in people where p.GroupId == firstGroup.Id select p.Id).ToList();
+
+            Assert.AreEqual(firstGroup.People.Count, firstGroupMemberIds.Count);
+            Assert.IsTrue(firstGroupMemberIds.All(id => firstGroup.People.Any(m => m.Id == id)));
+        }
     }
 }

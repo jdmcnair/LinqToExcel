@@ -277,6 +277,17 @@ namespace LinqToExcel.Query
                         prop.Name;
                     if (columns.Contains(columnName))
                         result.SetProperty(prop.Name, GetColumnValue<T>(data, columnName, prop.Name, prop.PropertyType).Cast(prop.PropertyType));
+                    else if (_args.ForeignKeyTransformations.ContainsKey(TransformKey.Create(typeof(T), prop.Name)))
+                    {
+                        // foreign key mapping found, extract function and perform mapping
+                        var wkshtAndFunc = _args.ForeignKeyTransformations[TransformKey.Create(typeof(T), prop.Name)];
+                        string worksheet = wkshtAndFunc.Item1;
+                        var func = wkshtAndFunc.Item2;
+                        // get type for second table mapping
+                        var propQueryType = prop.PropertyType.GetGenericArguments()[0];
+                        // create list and add selected items
+                        result.SetListProperty(prop.Name, func(result, _args.SheetDataIncludes[TransformKey.Create(propQueryType, worksheet)]), propQueryType);
+                    }
                 }
                 results.Add(result);
             }

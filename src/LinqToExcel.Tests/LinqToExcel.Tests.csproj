@@ -91,8 +91,10 @@
     <Compile Include="ConnectionString_UnitTests.cs" />
     <Compile Include="Excel2007_IntegrationTests.cs" />
     <Compile Include="ExcelQueryFactoryTests.cs" />
+    <Compile Include="Group.cs" />
     <Compile Include="NoHeader_IntregrationTests.cs" />
     <Compile Include="NoHeader_SQLStatements_UnitTests.cs" />
+    <Compile Include="Person.cs" />
     <Compile Include="Range_IntegrationTests.cs" />
     <Compile Include="Range_SQLStatements_UnitTests.cs" />
     <Compile Include="IMEX_Tests.cs" />

@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using LinqToExcel.Query;
 using System.Collections.Generic;
 using LinqToExcel.Domain;
+using System.Linq;
 
 namespace LinqToExcel
 {
@@ -195,5 +196,30 @@ namespace LinqToExcel
         /// </summary>
         /// <param name="worksheetName">Worksheet name to get the list of column names from</param>
         IEnumerable<string> GetColumnNames(string worksheetName);
+
+        /// <summary>
+        /// Adds a mapping to relate members of one spreadsheet to another by way of a selection query
+        /// </summary>
+        /// <typeparam name="TSheetData">Class type to return row data as</typeparam>
+        /// <typeparam name="TSheetData2">Class of mapped type</typeparam>
+        /// <param name="property">Lambda expression that selects the List property to set</param>
+        /// <param name="transformation">Lambda expression that selects members from the second worksheet to relate to the first</param>
+        /// <param name="worksheet">optional worksheet name</param>
+        /// <example>
+        /// AddMapping{Group,People}(g => g.GroupMembers, (g,pp) => pp.Where(p => p.GroupId == g.Id);
+        /// </example>
+        void AddMapping<TSheetData, TSheetData2>(System.Linq.Expressions.Expression<Func<TSheetData, System.Collections.Generic.IList<TSheetData2>>> property, Func<TSheetData, System.Linq.IQueryable<TSheetData2>, System.Linq.IQueryable<TSheetData2>> transformation, string worksheet = null) where TSheetData : class;
+
+        /// <summary>
+        /// Transforms all cell values mapped to a particular property type in the spreadsheet to the desired property value
+        /// </summary>
+        /// <typeparam name="TProperty">Class type to return row data as</typeparam>
+        /// <param name="transformation">Lambda expression that transforms the original string value to the desired property value</param>
+        /// <example>
+        /// AddTransformation{bool}(x => x == "Y");
+        /// AddTransformation{bool}(x => DateTime.Parse(x) > new DateTime(2000, 1, 1));
+        /// </example>
+        void AddTransformation<TProperty>(Func<string, object> transformation);
+
     }
 }
